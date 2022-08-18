@@ -2,4 +2,4 @@
 url: https://releases.hashicorp.com/vault/0.10.3/vault_0.10.3_linux_amd64.zip
 location_zip: /opt/vault_0.10.3_linux_amd64.zip
 location_unzip: /opt/vault_0.10.3_linux_amd64
-target_url: 
+target_url: "{{hostvars['h-Vault'].ansible_ens192.ipv4.address}}"

@@ -1,8 +1,4 @@
 ---
-- name: Debug
-  debug: 
-    msg: "{{hostvars['h-Vault'].ansible_ens192.ipv4.address}}"
-
 - name: Update subscription manager
   command: subscription-manager refresh
 
