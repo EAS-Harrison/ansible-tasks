@@ -41,7 +41,7 @@
     path: /logs/vault/
     state: directory
 
-- name: make vault.service
+- name: make config.json
   blockinfile:
     dest: /etc/vault/config.json
     block: |
@@ -69,22 +69,54 @@
 
 - name: make vault.service
   blockinfile:
-    dest: /lib/systemd/system/myapp.service
+    dest: /etc/systemd/system/vault.service
     block: |
       [Unit]
-      Description=My app
+      Description=vault service
+      Requires=network-online.target
+      After=network-online.target
+      ConditionFileNotEmpty=/etc/vault/config.json
 
       [Service]
-      Type=simple
-      Restart=always
-      RestartSec=5
-      ExecStart=/usr/bin/node {{ app_location }}
-      User=root
-      Environment=TARGET_URL=HTTP://{{ target_url | split('-') | last }}.{{ domain_name }}
-      Environment=PORT={{ port }}
-      WorkingDirectory={{ app_location }}
+      EnvironmentFile=-/etc/sysconfig/vault
+      Environment=GOMAXPROCS=2
+      Restart=on-failure
+      ExecStart=/usr/bin/vault server -config=/etc/vault/config.json
+      StandardOutput=/logs/vault/output.log
+      StandardError=/logs/vault/error.log
+      LimitMEMLOCK=infinity
+      ExecReload=/bin/kill -HUP $MAINPID
+      KillSignal=SIGTERM
 
       [Install]
       WantedBy=multi-user.target
     insertafter: EOF
     create: yes
+
+- name: Allow traffic
+  ansible.posix.firewalld:
+    port: 8200/tcp
+    permanent: yes
+    state: enabled
+
+- name: Restart firewall
+  service:
+    name: firewalld
+    state: reloaded
+
+- name: enable vault
+  service:
+    name: vault
+    enabled: true
+    state: started
+
+- name: Set env variables
+  shell: export VAULT_ADDR=http://{{ target_url }}:8200
+
+- name: Add env var
+  lineinfile:
+    line: VAULT_ADDR=http://{{ target_url }}:8200
+    dest: ~/.bashrc
+
+- name: Initiate server
+  command: vault operator init > /etc/vault/init.file
