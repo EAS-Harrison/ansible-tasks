@@ -1,0 +1,94 @@
+---
+- name: Debug
+  debug: 
+    msg: "{{hostvars['h-Vault'].ansible_ens192.ipv4.address}}"
+
+- name: Update subscription manager
+  command: subscription-manager refresh
+
+- name: Install 
+  become_user: root
+  yum:
+    name: 
+      - wget
+      - unzip
+
+- name: Get vault repo
+  get_url: 
+    url: "{{ url }}"
+    dest: "{{ location_zip }}"
+  
+- name: Unarchive vault
+  ansible.builtin.unarchive:
+    src: "{{ location_zip }}" 
+    dest: /opt/
+    remote_src: yes
+
+- name: Copy file with owner and permissions
+  ansible.builtin.copy:
+    src: /opt/vault
+    dest: /usr/bin
+    remote_src: yes
+
+- name: Create a directory
+  ansible.builtin.file:
+    path: /etc/vault
+    state: directory
+
+- name: Create a directory
+  ansible.builtin.file:
+    path: /etc/vault-data
+    state: directory
+
+- name: Create a directory
+  ansible.builtin.file:
+    path: /logs/vault/
+    state: directory
+
+- name: make vault.service
+  blockinfile:
+    dest: /etc/vault/config.json
+    block: |
+      {
+      "listener": [{
+      "tcp": {
+      "address" : "0.0.0.0:8200",
+      "tls_disable" : 1
+      }
+      }],
+      "api_addr": "http://{{ target_url }}:8200",
+      "storage": {
+          "file": {
+          "path" : "/vault-data"
+          }
+       },
+      "max_lease_ttl": "10h",
+      "default_lease_ttl": "10h",
+      "ui":true
+      }
+
+    insertafter: EOF
+    create: yes
+
+
+- name: make vault.service
+  blockinfile:
+    dest: /lib/systemd/system/myapp.service
+    block: |
+      [Unit]
+      Description=My app
+
+      [Service]
+      Type=simple
+      Restart=always
+      RestartSec=5
+      ExecStart=/usr/bin/node {{ app_location }}
+      User=root
+      Environment=TARGET_URL=HTTP://{{ target_url | split('-') | last }}.{{ domain_name }}
+      Environment=PORT={{ port }}
+      WorkingDirectory={{ app_location }}
+
+      [Install]
+      WantedBy=multi-user.target
+    insertafter: EOF
+    create: yes
