@@ -1,6 +1,6 @@
 ---
 - hosts: all
-  become: true
+  become: root
 
   roles:
     - { role: ./roles/vault }

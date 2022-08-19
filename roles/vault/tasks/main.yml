@@ -24,6 +24,7 @@
   ansible.builtin.copy:
     src: /opt/vault
     dest: /usr/bin
+    mode: '0777'
     remote_src: yes
 
 - name: Create a directory
@@ -37,29 +38,24 @@
     state: directory
 
 - name: Create a directory
-  ansible.builtin.file:
-    path: /logs/vault/
-    state: directory
+  command: mkdir -p /logs/vault/
+
 
 - name: make config.json
   blockinfile:
     dest: /etc/vault/config.json
     block: |
-      {
-      "listener": [{
-      "tcp": {
-      "address" : "0.0.0.0:8200",
-      "tls_disable" : 1
+      storage "file" {
+        path = "/etc/vault-data"
       }
-      }],
+
+      listener "tcp" {
+      address = "127.0.0.1:8200"
+      tls_disable = "true"
+      }
+      
+
       "api_addr": "http://{{ target_url }}:8200",
-      "storage": {
-          "file": {
-          "path" : "/vault-data"
-          }
-       },
-      "max_lease_ttl": "10h",
-      "default_lease_ttl": "10h",
       "ui":true
       }
 
@@ -78,9 +74,10 @@
       ConditionFileNotEmpty=/etc/vault/config.json
 
       [Service]
+      User=root
       EnvironmentFile=-/etc/sysconfig/vault
       Environment=GOMAXPROCS=2
-      Restart=on-failure
+      Restart=on-abort
       ExecStart=/usr/bin/vault server -config=/etc/vault/config.json
       StandardOutput=/logs/vault/output.log
       StandardError=/logs/vault/error.log
@@ -92,6 +89,7 @@
       WantedBy=multi-user.target
     insertafter: EOF
     create: yes
+
 
 - name: Allow traffic
   ansible.posix.firewalld:
@@ -111,12 +109,10 @@
     state: started
 
 - name: Set env variables
-  shell: export VAULT_ADDR=http://{{ target_url }}:8200
+  shell: export export VAULT_ADDR='http://127.0.0.1:8200'
 
 - name: Add env var
-  lineinfile:
-    line: VAULT_ADDR=http://{{ target_url }}:8200
-    dest: ~/.bashrc
+  command: echo "export VAULT_ADDR='http://127.0.0.1:8200'" >> ~/.bashrc
 
 - name: Initiate server
   command: vault operator init > /etc/vault/init.file
