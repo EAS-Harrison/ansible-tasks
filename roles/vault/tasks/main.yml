@@ -45,12 +45,12 @@
   blockinfile:
     dest: /etc/vault/config.json
     block: |
-      storage "file" {
+      storage "storage" {
         path = "/etc/vault-data"
       }
 
       listener "tcp" {
-      address = "127.0.0.1:8200"
+      address = "http://127.0.0.1:8200"
       tls_disable = "true"
       }
       
@@ -109,10 +109,10 @@
     state: started
 
 - name: Set env variables
-  shell: export export VAULT_ADDR='http://127.0.0.1:8200'
+  shell: export VAULT_ADDR='http://127.0.0.1:8200'
 
 - name: Add env var
   command: echo "export VAULT_ADDR='http://127.0.0.1:8200'" >> ~/.bashrc
 
 - name: Initiate server
-  command: vault operator init > /etc/vault/init.file
+  command: vault operator init -address=http://127.0.0.1:8200 > /etc/vault/init.file
