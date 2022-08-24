@@ -44,20 +44,21 @@
 - name: make config.json
   blockinfile:
     dest: /etc/vault/config.json
+    marker: ""
     block: |
-      storage "storage" {
-        path = "/etc/vault-data"
-      }
-
       listener "tcp" {
-      address = "http://127.0.0.1:8200"
-      tls_disable = "true"
+      address = "0.0.0.0:8200"
+      tls_disable = "1"
       }
-      
+      api_addr = "http://{{ target_url }}:8200"
 
-      "api_addr": "http://{{ target_url }}:8200",
-      "ui":true
+      storage "file" {
+        path = "/vault-data"
       }
+
+      max_lease_ttl = "10h"
+      default_lease_ttl = "10h"
+      ui = true
 
     insertafter: EOF
     create: yes
@@ -90,6 +91,18 @@
     insertafter: EOF
     create: yes
 
+- name: enable vault
+  service:
+    name: vault
+    enabled: true
+    state: started
+
+
+- name: Add env var 
+  shell: echo "export VAULT_ADDR='http://127.0.0.1:8200'" >> ~/.bashrc | source ~/.bashrc 
+
+- name: Initiate server
+  shell: source ~/.bashrc | vault operator init > /etc/vault/init.file
 
 - name: Allow traffic
   ansible.posix.firewalld:
@@ -105,14 +118,75 @@
 - name: enable vault
   service:
     name: vault
-    enabled: true
-    state: started
+    state: restarted
 
-- name: Set env variables
-  shell: export VAULT_ADDR='http://127.0.0.1:8200'
+- name: Create a directory
+  ansible.builtin.file:
+    path: /etc/keys
+    state: directory
 
-- name: Add env var
-  command: echo "export VAULT_ADDR='http://127.0.0.1:8200'" >> ~/.bashrc
+- name: Touch key 1
+  ansible.builtin.file:
+    path: /etc/keys/1.txt
+    state: touch
 
-- name: Initiate server
-  command: vault operator init -address=http://127.0.0.1:8200 > /etc/vault/init.file
+- name: Creating passkey 1
+  shell: head /etc/vault/init.file -c 58 | tail -c 44 > /etc/keys/1.txt
+
+- name: Display resolv.conf contents
+  shell: echo "$(</etc/keys/1.txt)"
+  register: command_output1
+
+- name: unseal vault
+  command: vault operator unseal {{ command_output1.stdout }}
+
+- name: Touch key 2
+  ansible.builtin.file:
+    path: /etc/keys/2.txt
+    state: touch
+
+- name: Creating passkey 2
+  shell: head /etc/vault/init.file -c 117 | tail -c 44 > /etc/keys/2.txt
+
+- name: Display resolv.conf contents
+  shell: echo "$(</etc/keys/2.txt)"
+  register: command_output2
+
+- name: unseal vault
+  command: vault operator unseal {{ command_output2.stdout }}
+
+- name: Touch key 3
+  ansible.builtin.file:
+    path: /etc/keys/3.txt
+    state: touch
+
+
+- name: Creating passkey 3
+  shell: head /etc/vault/init.file -c 176 | tail -c 44 > /etc/keys/3.txt
+
+- name: Display resolv.conf contents
+  shell: echo "$(</etc/keys/3.txt)"
+  register: command_output3
+
+- name: unseal vault
+  command: vault operator unseal {{ command_output3.stdout }}
+
+- name: Touch root token
+  ansible.builtin.file:
+    path: /etc/keys/token.txt
+    state: touch
+
+- name: Creating token
+  shell: head /etc/vault/init.file -c 352 | tail -c 36 > /etc/keys/token.txt
+
+- name: Display resolv.conf contents
+  shell: echo "$(</etc/keys/token.txt)"
+  register: command_output4
+
+- name: check var
+  debug:
+    msg: "Vaults IP is {{ target_url }}:8200/ui"
+
+- name: Get token
+  debug:
+    msg: "Use token: {{ command_output4.stdout }} to sign into vault"
