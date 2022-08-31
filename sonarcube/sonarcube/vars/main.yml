@@ -1,0 +1,11 @@
+---
+
+
+PSQL: "https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm"
+PSQL_dest: pgdg-redhat-repo-latest.noarch.rpm
+db_password: Renegade187!
+app_url: "https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-7.6.zip"
+app_location_zip: sonarqube-7.6.zip
+epel: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
+epel_dest: epel-release-latest-7.noarch.rpm
+target_url: "{{hostvars['h-Sonarqube'].ansible_ens192.ipv4.address}}"

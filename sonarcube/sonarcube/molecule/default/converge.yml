@@ -1,0 +1,7 @@
+---
+- name: Converge
+  hosts: all
+  tasks:
+    - name: "Include eas.sonarcube"
+      include_role:
+        name: "eas.sonarcube"
