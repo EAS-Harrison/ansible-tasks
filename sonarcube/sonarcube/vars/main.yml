@@ -9,3 +9,11 @@ app_location_zip: sonarqube-7.6.zip
 epel: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
 epel_dest: epel-release-latest-7.noarch.rpm
 target_url: "{{hostvars['h-Sonarqube'].ansible_ens192.ipv4.address}}"
+docker_ce_url: "https://download.docker.com/linux/rhel/7/s390x/stable/Packages/docker-ce-19.03.10-3.el7.s390x.rpm" 
+docker_ce: docker-ce-19.03.10-3.el7.s390x.rpm
+docker_ce_cli_url: "https://download.docker.com/linux/rhel/7/s390x/stable/Packages/docker-ce-cli-19.03.10-3.el7.s390x.rpm"
+docker_ce_cli: docker-ce-cli-19.03.10-3.el7.s390x.rpm
+containerd.io_url: "https://download.docker.com/linux/rhel/7/s390x/stable/Packages/containerd.io-1.2.13-3.2.el7.s390x.rpm"
+containerd.io: containerd.io-1.2.13-3.2.el7.s390x.rpm
+docker_compose_plugin_url: "https://download.docker.com/linux/rhel/7/s390x/stable/Packages/docker-compose-plugin-2.3.3-3.el7.s390x.rpm"
+docker_compose_plugin: docker-compose-plugin-2.3.3-3.el7.s390x.rpm

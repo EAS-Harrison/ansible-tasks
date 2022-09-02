@@ -1,5 +1,5 @@
----
-# Prep the Server With Required Softwares
+# ---
+# # Prep the Server With Required Softwares
 
 - name: Update subscription manager
   command: subscription-manager refresh
@@ -8,208 +8,75 @@
   become_user: root
   yum:
     name: 
-      - wget
-      - unzip
-      - java-11-openjdk-devel
+      - yum-utils
 
+- name: Install docker 
+  command: yum install -y docker
 
-- name: Execute initial commands
-  command: sysctl vm.max_map_count
-
-- name: Execute initial commands
-  command: sysctl fs.file-max
-
-# Setup PostgreSQL 10 Database For SonarQube
-
-- name: Download PostgreSQL 10 repo
-  get_url:
-    url: "{{ PSQL }}"
-    dest: /tmp/{{ PSQL_dest }}
-    validate_certs: no
-    timeout: 30
-
-- name: Install PostgreSQL 10
-  yum: 
-    name: /tmp/{{ PSQL_dest }}
-    state: present
-
-- name: Install 
-  become_user: root
-  yum:
-    name: 
-      - postgresql10-server
-      - postgresql10-contrib
-
-- name:  Initialize the database.
-  command: /usr/pgsql-10/bin/postgresql-10-setup initdb
-
-- name: change the authentication
-  lineinfile:
-    dest: /var/lib/pgsql/10/data/pg_hba.conf
-    search_string: 'local   all             all                                     peer'
-    line: local   all             all                                     trust
-
-- name: change the authentication
-  lineinfile:
-    dest: /var/lib/pgsql/10/data/pg_hba.conf
-    search_string: 'host    all             all             127.0.0.1/32            ident'
-    line: host    all             all             127.0.0.1/32            md5
-
-- name: change the authentication
-  lineinfile:
-    dest: /var/lib/pgsql/10/data/pg_hba.conf
-    search_string: 'host    all             all             ::1/128            ident'
-    line: host    all             all             ::1/128            md5
-
-- name: enable postgresql-10
+- name: enable docker
   service:
-    name: postgresql-10
+    name: docker
     enabled: true
     state: started
 
-# # Setup Sonar User and Database
+- name:  Create a volume
+  command: docker volume create --name sonarqube_data
 
-- name: Download epel repo
-  get_url:
-    url: "{{ epel }}"
-    dest: /tmp/{{ epel_dest }}
-    validate_certs: no
-    timeout: 30
+- name:  Create a volume
+  command: docker volume create --name sonarqube_logs
 
-- name: Install epel
-  yum: 
-    name: /tmp/{{ epel_dest }}
-    state: present
+- name: Create a volume
+  command: docker volume create --name sonarqube_extensions
 
-- name: Install
-  command: yum --disablerepo="*" --enablerepo="epel" list available
+- name:  Start the SonarQube container
+  command: docker run -d --name sonarqube \
+    -p 9000:9000 \
+    -e SONAR_JDBC_URL=jdbc:postgresql://db:5432/sonar \
+    -e SONAR_JDBC_USERNAME=sonar \
+    -e SONAR_JDBC_PASSWORD=sonar \
+    -v sonarqube_data:/opt/sonarqube/data \
+    -v sonarqube_extensions:/opt/sonarqube/extensions \
+    -v sonarqube_logs:/opt/sonarqube/logs \ 
+    sonarqube:latest
 
-- name: Install pip3
-  command:  yum install -y python3-pip 
+# - name: make vault.service
+#   blockinfile:
+#     dest: /tmp/docker-compose.yml
+#     marker: ""
+#     block: |
+#         version: "3"
+        
+#         services:
+#           sonarqube:
+#             image: sonarqube:community
+#             depends_on:
+#               - db
+#             environment:
+#               SONAR_JDBC_URL: jdbc:postgresql://localhost/sonar
+#               SONAR_JDBC_USERNAME: sonar
+#               SONAR_JDBC_PASSWORD: password
+#             volumes:
+#               - sonarqube_data:/opt/sonarqube/data
+#               - sonarqube_extensions:/opt/sonarqube/extensions
+#               - sonarqube_logs:/opt/sonarqube/logs
+#             ports:
+#               - "9000:9000"
+#           db:
+#             image: postgres:12
+#             environment:
+#               POSTGRES_USER: sonar
+#               POSTGRES_PASSWORD: sonar
+#             volumes:
+#               - postgresql:/var/lib/postgresql
+#               - postgresql_data:/var/lib/postgresql/data
+        
+#         volumes:
+#           sonarqube_data:
+#           sonarqube_extensions:
+#           sonarqube_logs:
+#           postgresql:
+#           postgresql_data:
+#     create: yes
 
-- name: Install lib-dev
-  command:  yum install -y postgresql-libs
-
-- name: Install setuptools
-  command: pip3 install setuptools wheel
-
-- name: Install psycopg2
-  command: yum install -y python-psycopg2
-
-
-- name: Create a new database 
-  community.postgresql.postgresql_db:
-    name: sonarqubedb
-
-- name: Create the sonarqube DB user with a strongly encrypted password
-  community.postgresql.postgresql_user:
-    name: sonarqube
-    password: '{{ db_password }}'
-
-- name: Grant all privileges
-  community.postgresql.postgresql_privs:
-    database: sonarqubedb
-    state: present
-    privs: SELECT,INSERT,UPDATE
-    type: table
-    objs: ALL_IN_SCHEMA
-    schema: public
-    roles: sonarqube
-    grant_option: yes
-
-# # # Setup Sonarqube Web Server
-
-- name: Get app build
-  become_user: root
-  get_url: 
-    url: "{{ app_url }}"
-    dest: "/opt/{{ app_location_zip }}"
-
-- name: Unarchive app
-  command: unzip /opt/{{ app_location_zip }}
-
-- name: Rename sonarqube file
-  command: mv ~/sonarqube-7.6 /opt/sonarqube
-
-- name: change the properties
-  lineinfile:
-    dest: /opt/sonarqube/conf/sonar.properties
-    search_string: '#sonar.jdbc.username='
-    line: sonar.jdbc.username=sonar                                                                                                                     
-
-- name: change the properties
-  lineinfile:
-    dest: /opt/sonarqube/conf/sonar.properties
-    search_string: '#sonar.jdbc.password='
-    line: sonar.jdbc.password=password 
-
-- name: change the properties
-  lineinfile:
-    dest: /opt/sonarqube/conf/sonar.properties
-    search_string: '#sonar.jdbc.url=jdbc:postgresql://localhost/sonarqube?currentSchema=my_schema'
-    line: sonar.jdbc.url=jdbc:postgresql://localhost/sonar 
-
-- name: change the properties
-  lineinfile:
-    dest: /opt/sonarqube/conf/sonar.properties
-    search_string: '#sonar.web.host=0.0.0.0'
-    line: sonar.web.host=0.0.0.0 
-
-- name: change the properties
-  lineinfile:
-    dest: /opt/sonarqube/conf/sonar.properties
-    search_string: '#sonar.web.port=9000'
-    line: sonar.web.port=9000 
-
-# # # Add Sonar User and Privileges
-
-- name: Add user sonar
-  command: useradd sonar
-
-- name: Add user sonar priveliges
-  command: chown -R sonar:sonar /opt/sonarqube 
-
-# # # Start Sonarqube Service
-
-# # # Setting up Sonarqube as a service
-
-- name: Make sonarqube service 
-  blockinfile:
-    dest: /etc/systemd/system/sonarqube.service
-    marker: ''
-    block: |
-      [Unit]
-      Description=SonarQube service
-      After=syslog.target network.target
-
-      [Service]
-      Type=simple
-      User=sonar
-      PermissionsStartOnly=true
-      ExecStart=/bin/nohup java -Xmx1024M -Xms1024M -Djava.net.preferIPv4Stack=true -jar /opt/sonarqube/lib/sonar-application-7.6.jar
-      StandardOutput=syslog
-      LimitNOFILE=65536
-      LimitNPROC=8192
-      Restart=on-abort
-
-      [Install]
-      WantedBy=multi-user.target
-
-    insertafter: EOF
-    create: yes
-- name: Allow traffic
-  ansible.posix.firewalld:
-    port: 9000/tcp
-    permanent: yes
-    state: enabled
-
-- name: Restart firewall
-  service:
-    name: firewalld
-    state: reloaded
-
-- name: enable sonarqube
-  service:
-    name: sonarqube
-    enabled: true
-    state: started
+# - name: Compose
+#   command: docker compose /tmp/docker-compose.yml
